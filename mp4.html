@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube to MP4 Converter - YT2MP3</title>
+    <meta name="description" content="Convert YouTube videos to MP4 format easily. Fast, free, and high-quality video conversion with YT2MP3.">
+    <meta name="keywords" content="YouTube to MP4, video converter, YouTube downloader, MP4 converter">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <i class="fas fa-video"></i>
+                <span>YT2MP3</span>
+            </div>
+            
+            <div class="nav-menu">
+                <div class="nav-links">
+                    <a href="index.html" class="nav-link">Convert Youtube to MP3</a>
+                    <a href="mp4.html" class="nav-link active">Convert Youtube to MP4</a>
+                </div>
+            </div>
+            
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <div class="container">
+                <h1 class="hero-title">
+                    <i class="fas fa-download"></i>
+                    YouTube to MP4 Converter
+                </h1>
+                <p class="hero-subtitle">Free, fast, high-quality YouTube video converter with multiple MP4 resolutions</p>
+                
+                <!-- Converter Main Interface -->
+                <div class="converter-box">
+                    <div class="input-section">
+                        <!-- Smart Input Container -->
+                        <div class="smart-input-container">
+                            <div class="url-input-wrapper">
+                                <input type="text" id="youtube-url" placeholder="Paste YouTube video link here for instant conversion..." class="url-input">
+                                <div class="input-status" id="input-status">
+                                    <i class="fas fa-link"></i>
+                                </div>
+                            </div>
+                            <button class="convert-btn" onclick="startConversion()" id="convert-btn">
+                                <i class="fas fa-magic"></i>
+                                Convert
+                            </button>
+                        </div>
+                        
+                        <!-- Auto Conversion Info -->
+                        <div class="auto-info">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Auto-converts to 6 formats: MP3 (128k, 256k, 320k) + MP4 (360p, 720p, 1080p)</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Display -->
+                    <div class="progress-section" id="progress-section" style="display: none;">
+                        <div class="progress-info">
+                            <img id="video-thumbnail" class="video-thumbnail" alt="Video thumbnail">
+                            <div class="video-details">
+                                <h3 id="video-title"></h3>
+                                <p id="video-duration"></p>
+                            </div>
+                        </div>
+                        <div class="overall-progress">
+                            <div class="progress-bar-container">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progress-fill"></div>
+                                </div>
+                                <span class="progress-text" id="progress-text">0%</span>
+                            </div>
+                            <div class="conversion-status" id="conversion-status">Analyzing video...</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Multi-Format Downloads -->
+                    <div class="downloads-section" id="downloads-section" style="display: none;">
+                        <h3 class="downloads-title">
+                            <i class="fas fa-download"></i>
+                            Available Downloads
+                        </h3>
+                        
+                        <div class="formats-container">
+                            <!-- Audio Downloads -->
+                            <div class="format-group">
+                                <h4 class="format-group-title">
+                                    <i class="fas fa-music"></i>
+                                    Audio Formats (MP3)
+                                </h4>
+                                <div class="downloads-grid" id="audio-downloads">
+                                    <!-- Audio download items will be populated here -->
+                                </div>
+                            </div>
+                            
+                            <!-- Video Downloads -->
+                            <div class="format-group">
+                                <h4 class="format-group-title">
+                                    <i class="fas fa-video"></i>
+                                    Video Formats (MP4)
+                                </h4>
+                                <div class="downloads-grid" id="video-downloads">
+                                    <!-- Video download items will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- YouTube to MP4 Section -->
+        <section id="youtube-to-mp4" class="converter-section">
+            <div class="container">
+                <h2 class="section-title">Convert YouTube to MP4 - Multiple Video Qualities</h2>
+                <div class="converter-intro">
+                    <p>Download YouTube videos as high-quality MP4 files with our free YouTube to MP4 converter. Choose from multiple resolutions including 360p, 720p HD, and 1080p Full HD for the perfect viewing experience.</p>
+                    
+                    <div class="format-highlights">
+                        <div class="format-highlight">
+                            <i class="fas fa-mobile-alt"></i>
+                            <h3>MP4 360p</h3>
+                            <p>Mobile-friendly quality, smaller file size, perfect for mobile devices</p>
+                        </div>
+                        <div class="format-highlight">
+                            <i class="fas fa-desktop"></i>
+                            <h3>MP4 720p HD</h3>
+                            <p>High definition quality, balanced file size and video quality</p>
+                        </div>
+                        <div class="format-highlight">
+                            <i class="fas fa-tv"></i>
+                            <h3>MP4 1080p Full HD</h3>
+                            <p>Maximum quality, crystal clear video for large screens and TVs</p>
+                        </div>
+                    </div>
+                    
+                    <div class="cta-section">
+                        <a href="#" class="cta-btn" onclick="scrollToConverter(); return false;">
+                            <i class="fas fa-play"></i>
+                            Start Converting YouTube to MP4
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="features-section">
+            <div class="container">
+                <h2 class="section-title">Features</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <h3>Instant Conversion</h3>
+                        <p>Automatic conversion starts as soon as you paste a YouTube link - no button clicking required</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-layer-group"></i>
+                        </div>
+                        <h3>Multiple Formats</h3>
+                        <p>Get 6 formats in one go: 3 audio qualities (MP3) and 3 video resolutions (MP4)</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-gem"></i>
+                        </div>
+                        <h3>Premium Quality</h3>
+                        <p>High-quality outputs from 360p to 1080p Full HD video, all processed simultaneously</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h3>Safe & Secure</h3>
+                        <p>No user data storage, virus-free environment, protecting your privacy and device security</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-mobile-alt"></i>
+                        </div>
+                        <h3>Cross-Platform</h3>
+                        <p>Works on all devices and browsers, allowing video conversion anytime, anywhere</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-gift"></i>
+                        </div>
+                        <h3>Completely Free</h3>
+                        <p>No payment required, no usage restrictions, enjoy all features permanently free</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How to Use Section -->
+        <section id="how-to-use" class="how-to-section">
+            <div class="container">
+                <h2 class="section-title">How to Use</h2>
+                <div class="steps-container">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Paste YouTube Link</h3>
+                            <p>Simply paste any YouTube video URL into the input field</p>
+                        </div>
+                    </div>
+                    
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Auto Processing</h3>
+                            <p>Conversion automatically starts and processes 6 different formats</p>
+                        </div>
+                    </div>
+                    
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Download Video Formats</h3>
+                            <p>Choose from 3 video qualities (360p, 720p, 1080p) to download</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Conversion History -->
+        <section class="history-section">
+            <div class="container">
+                <h2 class="section-title">
+                    <i class="fas fa-history"></i>
+                    Conversion History
+                    <button class="clear-history-btn" onclick="clearHistory()">
+                        <i class="fas fa-trash"></i>
+                        Clear History
+                    </button>
+                </h2>
+                <div class="history-container" id="history-container">
+                    <div class="empty-history">
+                        <i class="fas fa-clock"></i>
+                        <p>No conversion history yet</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section id="faq" class="faq-section">
+            <div class="container">
+                <h2 class="section-title">Frequently Asked Questions</h2>
+                <div class="faq-container">
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">
+                            <h3>What video formats do I get with each conversion?</h3>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="faq-answer">
+                            <p>Each conversion automatically generates 6 files: 3 MP3 audio files (128kbps, 256kbps, 320kbps) and 3 MP4 video files (360p, 720p, 1080p).</p>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">
+                            <h3>Do I need to click a convert button?</h3>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="faq-answer">
+                            <p>No! Conversion starts automatically when you paste a valid YouTube URL. The convert button is there as backup if auto-conversion doesn't trigger.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">
+                            <h3>Is the conversion process safe?</h3>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="faq-answer">
+                            <p>Absolutely safe. We do not save any of your personal information or converted files. All processing is done in a secure environment with no virus threats.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">
+                            <h3>What's the difference between 360p, 720p, and 1080p?</h3>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="faq-answer">
+                            <p>360p is mobile-friendly with smaller file size, 720p offers HD quality perfect for most viewing, and 1080p provides Full HD quality for large screens and maximum clarity.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">
+                            <h3>Why choose this youtube converter mp4 tool?</h3>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="faq-answer">
+                            <p>Our youtube converter mp4 offers superior quality, multiple resolution options, and the fastest conversion speeds available online.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3><i class="fas fa-video"></i> YT2MP3</h3>
+                    <p>The most reliable YouTube converter with advanced features and exceptional quality.</p>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                    </div>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#how-to-use">How to Use</a></li>
+                        <li><a href="#faq">FAQ</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Available Formats</h4>
+                    <ul>
+                        <li>MP3: 128k, 256k, 320k</li>
+                        <li>MP4: 360p, 720p, 1080p</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2024 YT2MP3. All rights reserved.</p>
+                <div class="footer-links">
+                    <a href="#privacy">Privacy Policy</a>
+                    <a href="#terms">Terms of Service</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Notification Messages -->
+    <div class="notification" id="notification"></div>
+
+    <!-- Script Files -->
+    <script src="script.js"></script>
+</body>
+</html> 
