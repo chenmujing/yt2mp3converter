@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, abort
+from flask import Flask, request, jsonify, send_file, abort, send_from_directory
 from flask_cors import CORS
 import yt_dlp
 import os
@@ -20,6 +20,21 @@ CORS(app)
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# 添加根路径路由，返回主页面
+@app.route('/')
+def index():
+    """返回主页面"""
+    return send_file('index.html')
+
+# 添加静态文件路由
+@app.route('/<path:filename>')
+def static_files(filename):
+    """提供静态文件服务"""
+    try:
+        return send_from_directory('.', filename)
+    except FileNotFoundError:
+        abort(404)
 
 # FFmpeg路径检测和设置
 def find_ffmpeg_path():
