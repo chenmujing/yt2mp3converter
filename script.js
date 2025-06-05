@@ -4,6 +4,12 @@ let currentConversion = null;
 let batchQueue = [];
 let isConverting = false;
 let autoConvertTimeout;
+let currentTaskId = null;
+let statusCheckInterval = null;
+let selectedFormat = 'mp3'; // 默认选择MP3格式
+
+// API配置
+const API_BASE_URL = 'http://localhost:5000/api';
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
@@ -32,6 +38,12 @@ function addEventListeners() {
     urlInput.addEventListener('paste', handleUrlPaste);
     urlInput.addEventListener('input', handleUrlInput);
     urlInput.addEventListener('keydown', handleKeyDown);
+    
+    // Format selection events
+    const formatBtns = document.querySelectorAll('.format-btn');
+    formatBtns.forEach(btn => {
+        btn.addEventListener('click', handleFormatSelection);
+    });
     
     // Mobile navigation
     const mobileToggle = document.querySelector('.nav-mobile-toggle');
@@ -181,6 +193,30 @@ function handleUrlPaste(e) {
     }, 100);
 }
 
+// Format selection handling
+function handleFormatSelection(e) {
+    const formatBtn = e.currentTarget;
+    const format = formatBtn.dataset.format;
+    
+    // Update selected format
+    selectedFormat = format;
+    
+    // Update UI
+    document.querySelectorAll('.format-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    formatBtn.classList.add('active');
+    
+    // Re-trigger conversion if URL is already entered
+    const url = document.getElementById('youtube-url').value.trim();
+    if (url && isValidYouTubeUrl(url) && !isConverting) {
+        clearTimeout(autoConvertTimeout);
+        autoConvertTimeout = setTimeout(() => {
+            startConversion();
+        }, 800);
+    }
+}
+
 // Extract YouTube video ID
 function getYouTubeVideoId(url) {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -188,23 +224,34 @@ function getYouTubeVideoId(url) {
     return (match && match[2].length === 11) ? match[2] : null;
 }
 
-// Get video info (simulation)
-async function getVideoInfo(videoId) {
-    // This simulates getting video info, in a real application you would use the YouTube API
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve({
-                id: videoId,
-                title: `Video Title - ${videoId}`,
-                duration: '3:45',
-                thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
-                channel: 'Channel Name'
-            });
-        }, 1000);
-    });
+// Get video info from backend API
+async function getVideoInfo(url) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/video-info`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url: url })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data.success) {
+            return data.data;
+        } else {
+            throw new Error(data.error || 'Failed to get video info');
+        }
+    } catch (error) {
+        console.error('Error getting video info:', error);
+        throw error;
+    }
 }
 
-// Start conversion with multi-format output
+// Start conversion with real backend API
 async function startConversion() {
     if (isConverting) return;
     
@@ -232,39 +279,49 @@ async function startConversion() {
     downloadsSection.style.display = 'none';
     
     try {
-        const videoId = getYouTubeVideoId(url);
-        if (!videoId) {
-            throw new Error('Unable to parse video ID');
-        }
-        
-        // Get video info
+        // Step 1: Get video info
         updateConversionStatus('Getting video information...');
-        const videoInfo = await getVideoInfo(videoId);
-        
-        // Display video info
+        const videoInfo = await getVideoInfo(url);
         displayVideoInfo(videoInfo);
         
-        // Simulate multi-format conversion process
-        await simulateMultiFormatConversion(videoInfo);
+        // Step 2: Start conversion
+        updateConversionStatus('Starting conversion...');
         
-        // Generate download items for all formats
-        const downloadItems = generateDownloadItems(videoInfo, url);
-        displayDownloadItems(downloadItems);
+        // 根据选择的格式确定要转换的格式
+        let formats;
+        if (selectedFormat === 'mp3') {
+            formats = ['mp3_256']; // 只转换MP3 256kbps
+        } else {
+            formats = ['mp4_720']; // 只转换MP4 720p
+        }
         
-        // Hide progress section after conversion is complete
-        progressSection.style.display = 'none';
-        
-        // Add to history
-        addToHistory({
-            url: url,
-            videoInfo: videoInfo,
-            timestamp: new Date().toISOString(),
-            formats: downloadItems
+        const response = await fetch(`${API_BASE_URL}/convert`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                url: url,
+                formats: formats
+            })
         });
         
-        showNotification('All formats converted successfully!', 'success');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const conversionData = await response.json();
+        if (!conversionData.success) {
+            throw new Error(conversionData.error || 'Conversion failed');
+        }
+        
+        currentTaskId = conversionData.task_id;
+        
+        // Step 3: Monitor conversion progress
+        await monitorConversionProgress(currentTaskId);
         
     } catch (error) {
+        console.error('Conversion error:', error);
         showNotification(`Conversion failed: ${error.message}`, 'error');
         progressSection.style.display = 'none';
     } finally {
@@ -272,115 +329,98 @@ async function startConversion() {
         convertBtn.innerHTML = '<i class="fas fa-magic"></i> Convert';
         inputStatus.innerHTML = '<i class="fas fa-check-circle"></i>';
         inputStatus.className = 'input-status valid';
+        
+        // Clear status check interval
+        if (statusCheckInterval) {
+            clearInterval(statusCheckInterval);
+            statusCheckInterval = null;
+        }
     }
+}
+
+// Monitor conversion progress
+async function monitorConversionProgress(taskId) {
+    return new Promise((resolve, reject) => {
+        statusCheckInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/status/${taskId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const status = await response.json();
+                
+                // Update progress UI
+                const progressFill = document.getElementById('progress-fill');
+                const progressText = document.getElementById('progress-text');
+                
+                progressFill.style.width = `${status.progress}%`;
+                progressText.textContent = `${status.progress}%`;
+                
+                // Update status text based on progress
+                if (status.progress < 20) {
+                    updateConversionStatus('Downloading video...');
+                } else if (status.progress < 40) {
+                    updateConversionStatus('Extracting audio...');
+                } else if (status.progress < 60) {
+                    updateConversionStatus('Converting formats...');
+                } else if (status.progress < 80) {
+                    updateConversionStatus('Optimizing quality...');
+                } else if (status.progress < 100) {
+                    updateConversionStatus('Finalizing files...');
+                } else {
+                    updateConversionStatus('Conversion complete!');
+                }
+                
+                if (status.status === 'completed') {
+                    clearInterval(statusCheckInterval);
+                    statusCheckInterval = null;
+                    
+                    // Display download links
+                    displayRealDownloadItems(status.files, status.video_info);
+                    
+                    // Hide progress section
+                    document.getElementById('progress-section').style.display = 'none';
+                    
+                    // Add to history
+                    addToHistory({
+                        url: document.getElementById('youtube-url').value.trim(),
+                        videoInfo: status.video_info,
+                        timestamp: new Date().toISOString(),
+                        taskId: taskId,
+                        files: status.files
+                    });
+                    
+                    showNotification('All formats converted successfully!', 'success');
+                    resolve();
+                    
+                } else if (status.status === 'error') {
+                    clearInterval(statusCheckInterval);
+                    statusCheckInterval = null;
+                    throw new Error(status.error || 'Conversion failed');
+                }
+                
+            } catch (error) {
+                clearInterval(statusCheckInterval);
+                statusCheckInterval = null;
+                reject(error);
+            }
+        }, 2000); // Check every 2 seconds
+    });
 }
 
 function displayVideoInfo(videoInfo) {
     document.getElementById('video-thumbnail').src = videoInfo.thumbnail;
     document.getElementById('video-title').textContent = videoInfo.title;
-    document.getElementById('video-duration').textContent = `Duration: ${videoInfo.duration} | Channel: ${videoInfo.channel}`;
+    document.getElementById('video-duration').textContent = `Duration: ${videoInfo.duration_string || 'Unknown'} | Channel: ${videoInfo.uploader || 'Unknown'}`;
 }
 
 function updateConversionStatus(status) {
     document.getElementById('conversion-status').textContent = status;
 }
 
-async function simulateMultiFormatConversion(videoInfo) {
-    const progressFill = document.getElementById('progress-fill');
-    const progressText = document.getElementById('progress-text');
-    
-    const steps = [
-        { progress: 20, status: 'Downloading video...' },
-        { progress: 40, status: 'Extracting audio...' },
-        { progress: 60, status: 'Converting format...' },
-        { progress: 80, status: 'Optimizing quality...' },
-        { progress: 100, status: 'Conversion complete!' }
-    ];
-    
-    for (const step of steps) {
-        await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
-        progressFill.style.width = `${step.progress}%`;
-        progressText.textContent = `${step.progress}%`;
-        updateConversionStatus(step.status);
-    }
-}
-
-function calculateFileSize(duration, quality) {
-    // Simulate file size calculation
-    const durationSeconds = parseDuration(duration);
-    const bitrateKbps = parseInt(quality);
-    const sizeBytes = (durationSeconds * bitrateKbps * 1000) / 8;
-    
-    if (sizeBytes < 1024 * 1024) {
-        return `${(sizeBytes / 1024).toFixed(1)} KB`;
-    } else {
-        return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
-    }
-}
-
-function parseDuration(duration) {
-    const parts = duration.split(':');
-    return parts.reduce((acc, part) => acc * 60 + parseInt(part), 0);
-}
-
-function generateDownloadItems(videoInfo, url) {
-    const duration = parseDuration(videoInfo.duration);
-    
-    return [
-        // Audio formats
-        {
-            name: `${videoInfo.title} - 128kbps.mp3`,
-            size: calculateFileSize(videoInfo.duration, '128'),
-            url: `${url}#mp3-128`,
-            type: 'audio'
-        },
-        {
-            name: `${videoInfo.title} - 256kbps.mp3`,
-            size: calculateFileSize(videoInfo.duration, '256'),
-            url: `${url}#mp3-256`,
-            type: 'audio'
-        },
-        {
-            name: `${videoInfo.title} - 320kbps.mp3`,
-            size: calculateFileSize(videoInfo.duration, '320'),
-            url: `${url}#mp3-320`,
-            type: 'audio'
-        },
-        // Video formats
-        {
-            name: `${videoInfo.title} - 360p.mp4`,
-            size: calculateVideoFileSize(duration, '360'),
-            url: `${url}#mp4-360`,
-            type: 'video'
-        },
-        {
-            name: `${videoInfo.title} - 720p.mp4`,
-            size: calculateVideoFileSize(duration, '720'),
-            url: `${url}#mp4-720`,
-            type: 'video'
-        },
-        {
-            name: `${videoInfo.title} - 1080p.mp4`,
-            size: calculateVideoFileSize(duration, '1080'),
-            url: `${url}#mp4-1080`,
-            type: 'video'
-        }
-    ];
-}
-
-function calculateVideoFileSize(durationSeconds, quality) {
-    // Video file size calculation (rough estimate)
-    const videoBitrate = quality === '360' ? 800 : quality === '720' ? 2500 : 5000;
-    const sizeBytes = (durationSeconds * (videoBitrate + 128) * 1000) / 8; // Video + audio bitrate
-    
-    if (sizeBytes < 1024 * 1024) {
-        return `${(sizeBytes / 1024).toFixed(1)} KB`;
-    } else {
-        return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
-    }
-}
-
-function displayDownloadItems(downloadItems) {
+// Display real download items with actual backend links
+function displayRealDownloadItems(files, videoInfo) {
     const downloadsSection = document.getElementById('downloads-section');
     const audioDownloads = document.getElementById('audio-downloads');
     const videoDownloads = document.getElementById('video-downloads');
@@ -389,24 +429,45 @@ function displayDownloadItems(downloadItems) {
     audioDownloads.innerHTML = '';
     videoDownloads.innerHTML = '';
     
-    // Separate audio and video items
-    const audioItems = downloadItems.filter(item => item.type === 'audio');
-    const videoItems = downloadItems.filter(item => item.type === 'video');
+    // 根据实际转换的格式显示下载项
+    let hasAudio = false;
+    let hasVideo = false;
     
-    // Generate audio download items
-    audioItems.forEach((item, index) => {
-        audioDownloads.appendChild(createDownloadItem(item, 'audio', index));
+    // Process all available files
+    Object.keys(files).forEach((format, index) => {
+        const fileInfo = files[format];
+        let item = {
+            name: fileInfo.filename,
+            size: formatFileSize(fileInfo.size),
+            url: `http://localhost:5000${fileInfo.download_url}`,
+        };
+        
+        if (format.startsWith('mp3')) {
+            item.type = 'audio';
+            audioDownloads.appendChild(createRealDownloadItem(item, 'audio', index));
+            hasAudio = true;
+        } else if (format.startsWith('mp4')) {
+            item.type = 'video';
+            videoDownloads.appendChild(createRealDownloadItem(item, 'video', index));
+            hasVideo = true;
+        }
     });
     
-    // Generate video download items
-    videoItems.forEach((item, index) => {
-        videoDownloads.appendChild(createDownloadItem(item, 'video', index));
-    });
+    // Hide empty sections
+    const audioSection = audioDownloads.closest('.format-group');
+    const videoSection = videoDownloads.closest('.format-group');
+    
+    if (audioSection) {
+        audioSection.style.display = hasAudio ? 'block' : 'none';
+    }
+    if (videoSection) {
+        videoSection.style.display = hasVideo ? 'block' : 'none';
+    }
     
     downloadsSection.style.display = 'block';
 }
 
-function createDownloadItem(item, type, index) {
+function createRealDownloadItem(item, type, index) {
     const div = document.createElement('div');
     div.className = 'download-item';
     
@@ -424,7 +485,7 @@ function createDownloadItem(item, type, index) {
                 <span class="file-size">${item.size}</span>
             </div>
         </div>
-        <button class="download-btn" onclick="downloadFile('${item.url}', '${item.name}')">
+        <button class="download-btn" onclick="downloadRealFile('${item.url}', '${item.name}')">
             <i class="fas fa-download"></i>
             Download
         </button>
@@ -433,17 +494,30 @@ function createDownloadItem(item, type, index) {
     return div;
 }
 
-function downloadFile(url, filename) {
-    // Create simulated download
+function downloadRealFile(url, filename) {
+    // Create real download link
     const link = document.createElement('a');
-    link.href = '#';
+    link.href = url;
     link.download = filename || 'download';
+    link.target = '_blank';
     
-    // Show download notification
-    showNotification(`Download started: ${filename || 'File'} (Demo version)`, 'success');
+    // Trigger download
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     
-    // In a real application, this would be a real file download link
-    console.log('Download file:', { url, filename });
+    showNotification(`Download started: ${filename}`, 'success');
+}
+
+// Helper function to format file size
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 // History functionality
@@ -491,73 +565,72 @@ function loadConversionHistory() {
         </div>
     `).join('');
     
-    // Add history styles
-    const style = document.createElement('style');
-    style.textContent = `
-        .history-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            background: var(--surface-color);
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-        }
-        
-        .history-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            flex: 1;
-        }
-        
-        .history-thumbnail {
-            width: 80px;
-            height: 60px;
-            border-radius: 8px;
-            object-fit: cover;
-        }
-        
-        .history-details h4 {
-            margin-bottom: 0.25rem;
-            color: var(--text-primary);
-            font-size: 1rem;
-        }
-        
-        .history-details p {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            margin-bottom: 0.25rem;
-        }
-        
-        .history-details small {
-            color: var(--text-secondary);
-            font-size: 0.75rem;
-        }
-        
-        .redownload-btn {
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.875rem;
-            transition: all 0.3s ease;
-        }
-        
-        .redownload-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
-        }
-    `;
-    
+    // Add history styles if not already added
     if (!document.getElementById('history-styles')) {
+        const style = document.createElement('style');
         style.id = 'history-styles';
+        style.textContent = `
+            .history-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 1rem;
+                margin-bottom: 1rem;
+                background: var(--surface-color);
+                border-radius: 12px;
+                border: 1px solid var(--border-color);
+            }
+            
+            .history-info {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                flex: 1;
+            }
+            
+            .history-thumbnail {
+                width: 80px;
+                height: 60px;
+                border-radius: 8px;
+                object-fit: cover;
+            }
+            
+            .history-details h4 {
+                margin-bottom: 0.25rem;
+                color: var(--text-primary);
+                font-size: 1rem;
+            }
+            
+            .history-details p {
+                color: var(--text-secondary);
+                font-size: 0.875rem;
+                margin-bottom: 0.25rem;
+            }
+            
+            .history-details small {
+                color: var(--text-secondary);
+                font-size: 0.75rem;
+            }
+            
+            .redownload-btn {
+                background: var(--primary-color);
+                color: white;
+                border: none;
+                padding: 0.5rem 1rem;
+                border-radius: 6px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-size: 0.875rem;
+                transition: all 0.3s ease;
+            }
+            
+            .redownload-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+            }
+        `;
         document.head.appendChild(style);
     }
 }
@@ -656,7 +729,7 @@ window.addEventListener('error', (e) => {
 window.toggleTheme = toggleTheme;
 window.pasteFromClipboard = pasteFromClipboard;
 window.startConversion = startConversion;
-window.downloadFile = downloadFile;
+window.downloadRealFile = downloadRealFile;
 window.clearHistory = clearHistory;
 window.toggleFaq = toggleFaq;
 window.scrollToConverter = scrollToConverter;

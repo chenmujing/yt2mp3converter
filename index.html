@@ -57,21 +57,30 @@
                         <!-- Smart Input Container -->
                         <div class="smart-input-container">
                             <div class="url-input-wrapper">
-                                <input type="text" id="youtube-url" placeholder="Paste YouTube video link here for instant conversion..." class="url-input">
+                                <input type="text" id="youtube-url" placeholder="Paste YouTube video link here..." class="url-input">
                                 <div class="input-status" id="input-status">
                                     <i class="fas fa-link"></i>
                                 </div>
                             </div>
+                            
+                            <!-- Format Selection -->
+                            <div class="format-selection">
+                                <div class="format-toggle" id="format-toggle">
+                                    <button class="format-btn active" data-format="mp3" id="mp3-btn">
+                                        <i class="fas fa-music"></i>
+                                        <span>MP3</span>
+                                    </button>
+                                    <button class="format-btn" data-format="mp4" id="mp4-btn">
+                                        <i class="fas fa-video"></i>
+                                        <span>MP4</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
                             <button class="convert-btn" onclick="startConversion()" id="convert-btn">
                                 <i class="fas fa-magic"></i>
                                 Convert
                             </button>
-                        </div>
-                        
-                        <!-- Auto Conversion Info -->
-                        <div class="auto-info">
-                            <i class="fas fa-info-circle"></i>
-                            <span>Auto-converts to 6 formats: MP3 (128k, 256k, 320k) + MP4 (360p, 720p, 1080p)</span>
                         </div>
                     </div>
                     
