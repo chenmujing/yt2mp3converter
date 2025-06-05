@@ -180,6 +180,59 @@ body {
     align-items: stretch;
 }
 
+/* 格式选择区域 */
+.format-selection {
+    display: flex;
+    align-items: center;
+}
+
+.format-toggle {
+    display: flex;
+    background: var(--surface-color);
+    border-radius: 10px;
+    border: 2px solid var(--border-color);
+    overflow: hidden;
+}
+
+.format-btn {
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    min-width: 60px;
+    text-align: center;
+}
+
+.format-btn span {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.format-btn i {
+    font-size: 1rem;
+    margin-bottom: 0.1rem;
+}
+
+.format-btn:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+.format-btn.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+.format-btn.active small {
+    opacity: 1;
+}
+
 .url-input-wrapper {
     flex: 1;
     position: relative;
@@ -810,7 +863,22 @@ body {
     
     .smart-input-container {
         flex-direction: column;
-        gap: 0.5rem;
+        gap: 1rem;
+    }
+    
+    .format-selection {
+        order: 2;
+        justify-content: center;
+    }
+    
+    .format-toggle {
+        width: 100%;
+        max-width: 200px;
+    }
+    
+    .format-btn {
+        flex: 1;
+        min-width: 70px;
     }
     
     .convert-btn {
