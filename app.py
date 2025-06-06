@@ -586,10 +586,10 @@ def start_cleanup_thread():
     
     threading.Thread(target=cleanup_loop, daemon=True).start()
 
+# 启动清理线程（适用于所有环境）
+start_cleanup_thread()
+
 if __name__ == '__main__':
-    # 启动清理线程
-    start_cleanup_thread()
-    
     # 从环境变量获取端口，默认为5000
     port = int(os.environ.get('PORT', 5000))
     
