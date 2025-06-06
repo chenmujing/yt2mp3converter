@@ -252,14 +252,30 @@ async function getVideoInfo(url) {
         }
         
         const data = await response.json();
-        if (data.success) {
+        
+        // 安全检查响应数据
+        if (!data || typeof data !== 'object') {
+            throw new Error('Invalid response data');
+        }
+        
+        if (data.success && data.data) {
             return data.data;
         } else {
             throw new Error(data.error || 'Failed to get video info');
         }
     } catch (error) {
         console.error('Error getting video info:', error);
-        throw error;
+        
+        // 如果获取视频信息失败，返回默认信息而不是抛出错误
+        const videoId = url.includes('v=') ? url.split('v=')[1]?.substring(0, 11) || 'unknown' : 'unknown';
+        return {
+            id: videoId,
+            title: 'YouTube Video',
+            duration: 180,
+            duration_string: '3:00',
+            thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+            uploader: 'Unknown Channel'
+        };
     }
 }
 
@@ -359,23 +375,35 @@ async function monitorConversionProgress(taskId) {
                 
                 const status = await response.json();
                 
+                // 安全检查状态对象
+                if (!status || typeof status !== 'object') {
+                    throw new Error('Invalid status response');
+                }
+                
+                // 确保progress是数字
+                const progress = typeof status.progress === 'number' ? status.progress : 0;
+                
                 // Update progress UI
                 const progressFill = document.getElementById('progress-fill');
                 const progressText = document.getElementById('progress-text');
                 
-                progressFill.style.width = `${status.progress}%`;
-                progressText.textContent = `${status.progress}%`;
+                if (progressFill) {
+                    progressFill.style.width = `${progress}%`;
+                }
+                if (progressText) {
+                    progressText.textContent = `${progress}%`;
+                }
                 
                 // Update status text based on progress
-                if (status.progress < 20) {
+                if (progress < 20) {
                     updateConversionStatus('Downloading video...');
-                } else if (status.progress < 40) {
+                } else if (progress < 40) {
                     updateConversionStatus('Extracting audio...');
-                } else if (status.progress < 60) {
+                } else if (progress < 60) {
                     updateConversionStatus('Converting formats...');
-                } else if (status.progress < 80) {
+                } else if (progress < 80) {
                     updateConversionStatus('Optimizing quality...');
-                } else if (status.progress < 100) {
+                } else if (progress < 100) {
                     updateConversionStatus('Finalizing files...');
                 } else {
                     updateConversionStatus('Conversion complete!');
@@ -591,50 +619,97 @@ function formatFileSize(bytes) {
 
 // History functionality
 function addToHistory(fileInfo) {
-    conversionHistory.unshift(fileInfo);
-    
-    // Limit history count
-    if (conversionHistory.length > 50) {
-        conversionHistory = conversionHistory.slice(0, 50);
+    try {
+        // 安全检查fileInfo
+        if (!fileInfo || typeof fileInfo !== 'object') {
+            console.error('Invalid fileInfo:', fileInfo);
+            return;
+        }
+        
+        // 确保必要的属性存在
+        const safeFileInfo = {
+            url: fileInfo.url || '',
+            videoInfo: fileInfo.videoInfo || { title: 'Unknown', thumbnail: '' },
+            timestamp: fileInfo.timestamp || new Date().toISOString(),
+            taskId: fileInfo.taskId || '',
+            files: fileInfo.files || {}
+        };
+        
+        conversionHistory.unshift(safeFileInfo);
+        
+        // Limit history count
+        if (conversionHistory.length > 50) {
+            conversionHistory = conversionHistory.slice(0, 50);
+        }
+        
+        localStorage.setItem('conversionHistory', JSON.stringify(conversionHistory));
+        loadConversionHistory();
+    } catch (error) {
+        console.error('Error adding to history:', error);
     }
-    
-    localStorage.setItem('conversionHistory', JSON.stringify(conversionHistory));
-    loadConversionHistory();
 }
 
 function loadConversionHistory() {
-    const historyContainer = document.getElementById('history-container');
-    
-    if (conversionHistory.length === 0) {
-        historyContainer.innerHTML = `
-            <div class="empty-history">
-                <i class="fas fa-clock"></i>
-                <p>No conversion history yet</p>
-            </div>
-        `;
-        return;
-    }
-    
-    historyContainer.innerHTML = conversionHistory.map(item => `
-        <div class="history-item">
-            <div class="history-info">
-                <img src="${item.videoInfo.thumbnail}" alt="Thumbnail" class="history-thumbnail">
-                <div class="history-details">
-                    <h4>${item.videoInfo.title}</h4>
-                    <p>6 formats: MP3 (128k, 256k, 320k) + MP4 (360p, 720p, 1080p)</p>
-                    <small>Converted: ${new Date(item.timestamp).toLocaleString('en-US')}</small>
+    try {
+        const historyContainer = document.getElementById('history-container');
+        
+        if (!historyContainer) {
+            console.error('History container not found');
+            return;
+        }
+        
+        if (!conversionHistory || conversionHistory.length === 0) {
+            historyContainer.innerHTML = `
+                <div class="empty-history">
+                    <i class="fas fa-clock"></i>
+                    <p>No conversion history yet</p>
+                </div>
+            `;
+            return;
+        }
+        
+        historyContainer.innerHTML = conversionHistory.map(item => {
+            // 安全检查每个历史项目
+            const videoInfo = item.videoInfo || { title: 'Unknown', thumbnail: '' };
+            const title = videoInfo.title || 'Unknown';
+            const thumbnail = videoInfo.thumbnail || 'https://via.placeholder.com/80x60?text=No+Image';
+            const url = item.url || '';
+            const timestamp = item.timestamp || new Date().toISOString();
+            
+            return `
+            <div class="history-item">
+                <div class="history-info">
+                    <img src="${thumbnail}" alt="Thumbnail" class="history-thumbnail" 
+                         onerror="this.src='https://via.placeholder.com/80x60?text=No+Image'">
+                    <div class="history-details">
+                        <h4>${title}</h4>
+                        <p>Download completed</p>
+                        <small>Converted: ${new Date(timestamp).toLocaleString('en-US')}</small>
+                    </div>
+                </div>
+                <div class="history-actions">
+                    <button onclick="redownload('${url}')" class="redownload-btn">
+                        <i class="fas fa-redo"></i>
+                        Re-convert
+                    </button>
                 </div>
             </div>
-            <div class="history-actions">
-                <button onclick="redownload('${item.url}')" class="redownload-btn">
-                    <i class="fas fa-redo"></i>
-                    Re-convert
-                </button>
-            </div>
-        </div>
-    `).join('');
-    
-    // Add history styles if not already added
+            `;
+                 }).join('');
+    } catch (error) {
+        console.error('Error loading history:', error);
+        const historyContainer = document.getElementById('history-container');
+        if (historyContainer) {
+            historyContainer.innerHTML = `
+                <div class="empty-history">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error loading history</p>
+                </div>
+            `;
+        }
+    }
+     
+     // Add history styles if not already added
     if (!document.getElementById('history-styles')) {
         const style = document.createElement('style');
         style.id = 'history-styles';
