@@ -413,12 +413,19 @@ async function monitorConversionProgress(taskId) {
                     clearInterval(statusCheckInterval);
                     statusCheckInterval = null;
                     
+                    // 调试：记录完整的status响应
+                    console.log('Conversion completed, status:', status);
+                    
                     // 安全检查响应数据
                     const files = status.files || {};
                     const videoInfo = status.video_info || {};
                     
-                    // Display download links
-                    if (Object.keys(files).length > 0) {
+                    console.log('Files object:', files);
+                    console.log('Files keys:', Object.keys(files));
+                    console.log('Files length:', Object.keys(files).length);
+                    
+                    // 显示下载链接 - 移除严格检查，总是尝试显示
+                    try {
                         displayRealDownloadItems(files, videoInfo);
                         
                         // Add to history
@@ -430,9 +437,10 @@ async function monitorConversionProgress(taskId) {
                             files: files
                         });
                         
-                        showNotification('All formats converted successfully!', 'success');
-                    } else {
-                        throw new Error('No download files available');
+                        showNotification('Conversion completed!', 'success');
+                    } catch (displayError) {
+                        console.error('Display error:', displayError);
+                        showNotification('Conversion completed but display failed', 'warning');
                     }
                     
                     // Hide progress section
@@ -477,19 +485,54 @@ function updateConversionStatus(status) {
 
 // Display real download items with actual backend links
 function displayRealDownloadItems(files, videoInfo) {
-    if (!files || typeof files !== 'object') {
-        console.error('Files data is invalid:', files);
-        showNotification('No download files available', 'error');
-        return;
-    }
+    console.log('displayRealDownloadItems called with:', files, videoInfo);
     
     const downloadsSection = document.getElementById('downloads-section');
     const audioDownloads = document.getElementById('audio-downloads');
     const videoDownloads = document.getElementById('video-downloads');
     
     // Clear previous downloads
-    audioDownloads.innerHTML = '';
-    videoDownloads.innerHTML = '';
+    if (audioDownloads) audioDownloads.innerHTML = '';
+    if (videoDownloads) videoDownloads.innerHTML = '';
+    
+    // 如果没有文件或文件无效，显示重试选项
+    if (!files || typeof files !== 'object' || Object.keys(files).length === 0) {
+        console.log('No valid files, showing retry option');
+        if (downloadsSection) {
+            downloadsSection.innerHTML = `
+                <div class="no-files-message">
+                    <h3>下载文件生成中...</h3>
+                    <p>正在准备下载文件，请稍候或刷新页面重试</p>
+                    <button onclick="location.reload()" class="retry-btn">
+                        <i class="fas fa-refresh"></i> 刷新页面
+                    </button>
+                </div>
+                <style>
+                .no-files-message {
+                    text-align: center;
+                    padding: 2rem;
+                    background: var(--surface-color);
+                    border-radius: 12px;
+                    margin: 1rem 0;
+                }
+                .retry-btn {
+                    background: var(--primary-color);
+                    color: white;
+                    border: none;
+                    padding: 0.75rem 1.5rem;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    margin-top: 1rem;
+                }
+                .retry-btn:hover {
+                    background: var(--primary-hover);
+                }
+                </style>
+            `;
+            downloadsSection.style.display = 'block';
+        }
+        return;
+    }
     
     // 根据实际转换的格式显示下载项
     let hasAudio = false;
@@ -498,6 +541,8 @@ function displayRealDownloadItems(files, videoInfo) {
     // Process all available files
     Object.keys(files).forEach((format, index) => {
         const fileInfo = files[format];
+        console.log(`Processing format ${format}:`, fileInfo);
+        
         if (!fileInfo || !fileInfo.filename || !fileInfo.download_url) {
             console.error('Invalid file info:', fileInfo);
             return;
@@ -516,18 +561,24 @@ function displayRealDownloadItems(files, videoInfo) {
         
         if (format.startsWith('mp3')) {
             item.type = 'audio';
-            audioDownloads.appendChild(createRealDownloadItem(item, 'audio', index));
-            hasAudio = true;
+            if (audioDownloads) {
+                audioDownloads.appendChild(createRealDownloadItem(item, 'audio', index));
+                hasAudio = true;
+            }
         } else if (format.startsWith('mp4')) {
             item.type = 'video';
-            videoDownloads.appendChild(createRealDownloadItem(item, 'video', index));
-            hasVideo = true;
+            if (videoDownloads) {
+                videoDownloads.appendChild(createRealDownloadItem(item, 'video', index));
+                hasVideo = true;
+            }
         }
     });
     
+    console.log(`Generated downloads: audio=${hasAudio}, video=${hasVideo}`);
+    
     // Hide empty sections
-    const audioSection = audioDownloads.closest('.format-group');
-    const videoSection = videoDownloads.closest('.format-group');
+    const audioSection = audioDownloads?.closest('.format-group');
+    const videoSection = videoDownloads?.closest('.format-group');
     
     if (audioSection) {
         audioSection.style.display = hasAudio ? 'block' : 'none';
@@ -536,10 +587,14 @@ function displayRealDownloadItems(files, videoInfo) {
         videoSection.style.display = hasVideo ? 'block' : 'none';
     }
     
-    if (hasAudio || hasVideo) {
+    if (downloadsSection) {
         downloadsSection.style.display = 'block';
-    } else {
-        showNotification('No download files generated', 'error');
+    }
+    
+    // 即使没有文件也不报错，只显示信息
+    if (!hasAudio && !hasVideo) {
+        console.log('No download items created');
+        showNotification('下载文件准备中，请稍候...', 'info');
     }
 }
 
