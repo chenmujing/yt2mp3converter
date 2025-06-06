@@ -53,12 +53,12 @@ def get_video_info():
         
         # 模拟视频信息
         video_info = {
-            'id': 'test123',
-            'title': 'Test Video - ' + url.split('/')[-1][:20],
+            'id': 'demo123',
+            'title': '演示视频 - ' + url.split('/')[-1][:20] + ' [演示模式]',
             'duration': 210,
             'duration_string': '3:30',
-            'thumbnail': 'https://img.youtube.com/vi/test123/mqdefault.jpg',
-            'uploader': 'Test Channel',
+            'thumbnail': 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+            'uploader': '演示频道',
             'view_count': 1000000,
             'upload_date': '20240101'
         }
@@ -111,16 +111,21 @@ def get_conversion_status(task_id):
         'status': 'completed',
         'progress': 100,
         'video_info': {
-            'id': 'test123',
-            'title': 'Test Video',
+            'id': 'demo123',
+            'title': '演示视频 [演示模式]',
             'duration': 210,
-            'thumbnail': 'https://img.youtube.com/vi/test123/mqdefault.jpg'
+            'thumbnail': 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg'
         },
         'files': {
             'mp3_256': {
-                'filename': 'test_video.mp3',
+                'filename': '演示音频.mp3',
                 'size': 5242880,
                 'download_url': f'/api/download/{task_id}/mp3_256'
+            },
+            'mp4_720': {
+                'filename': '演示视频.mp4',
+                'size': 15728640,
+                'download_url': f'/api/download/{task_id}/mp4_720'
             }
         }
     }
@@ -129,16 +134,33 @@ def get_conversion_status(task_id):
 
 @app.route('/api/download/<task_id>/<format_type>', methods=['GET'])
 def download_file(task_id, format_type):
-    """下载文件（模拟）"""
+    """下载文件（重定向到真实文件）"""
     if task_id not in tasks:
         abort(404)
     
-    # 返回模拟提示
-    return jsonify({
-        'message': 'This is a demo API. File download is simulated.',
-        'task_id': task_id,
-        'format': format_type
-    })
+    # 根据不同格式重定向到示例文件
+    if 'mp3' in format_type:
+        # 重定向到一个公开的MP3示例文件
+        from flask import redirect
+        return redirect('https://www.soundjay.com/misc/sounds/beep-07a.mp3', code=302)
+    elif 'mp4' in format_type:
+        # 重定向到一个公开的MP4示例文件
+        from flask import redirect  
+        return redirect('https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4', code=302)
+    else:
+        # 返回HTML页面说明
+        return '''
+        <html>
+        <head><title>Demo Download</title></head>
+        <body>
+            <h1>这是演示模式</h1>
+            <p>当前API处于演示模式，实际的文件转换功能正在开发中。</p>
+            <p>任务ID: {}</p>
+            <p>格式: {}</p>
+            <p><a href="javascript:window.close()">关闭窗口</a></p>
+        </body>
+        </html>
+        '''.format(task_id, format_type)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
