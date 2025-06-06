@@ -475,10 +475,15 @@ function displayRealDownloadItems(files, videoInfo) {
             return;
         }
         
+        // 构建正确的下载URL
+        const baseUrl = API_BASE_URL.includes('localhost') 
+            ? 'http://localhost:5000'
+            : 'https://yt2mp3converter-production.up.railway.app';
+            
         let item = {
             name: fileInfo.filename,
             size: formatFileSize(fileInfo.size || 0),
-            url: `${API_BASE_URL.replace('/api', '')}${fileInfo.download_url}`,
+            url: `${baseUrl}${fileInfo.download_url}`,
         };
         
         if (format.startsWith('mp3')) {
@@ -538,18 +543,39 @@ function createRealDownloadItem(item, type, index) {
 }
 
 function downloadRealFile(url, filename) {
-    // Create real download link
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename || 'download';
-    link.target = '_blank';
-    
-    // Trigger download
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    showNotification(`Download started: ${filename}`, 'success');
+    try {
+        console.log(`Downloading: ${url}`);
+        showNotification(`开始下载: ${filename}`, 'success');
+        
+        // 直接在新窗口打开下载链接
+        const newWindow = window.open(url, '_blank');
+        
+        // 备用方案：如果新窗口被阻止，使用传统方法
+        if (!newWindow) {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename || 'download';
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // 检查下载状态
+        setTimeout(() => {
+            showNotification(`如果下载未开始，请直接点击下载链接`, 'info');
+        }, 3000);
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        showNotification(`下载失败: ${error.message}`, 'error');
+        
+        // 最后的备用方案：直接跳转
+        window.location.href = url;
+    }
 }
 
 // Helper function to format file size

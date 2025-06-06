@@ -39,8 +39,24 @@ def index():
         <p>支持真实YouTube下载的API</p>
         <p>Test endpoints:</p>
         <ul>
-            <li><a href="/api/health">/api/health</a></li>
+            <li><a href="/api/health">/api/health</a> - 健康检查</li>
+            <li><a href="/debug">/debug</a> - 调试信息</li>
         </ul>
+        <h3>活跃任务:</h3>
+        <div id="tasks"></div>
+        <script>
+            async function loadTasks() {
+                try {
+                    const response = await fetch('/api/health');
+                    const data = await response.json();
+                    document.getElementById('tasks').innerHTML = `<p>活跃任务数: ${data.active_tasks}</p>`;
+                } catch (e) {
+                    document.getElementById('tasks').innerHTML = '<p>无法加载任务信息</p>';
+                }
+            }
+            loadTasks();
+            setInterval(loadTasks, 5000);
+        </script>
     </body>
     </html>
     '''
@@ -53,6 +69,55 @@ def health_check():
         'message': 'YT2MP3 Enhanced API is running',
         'active_tasks': len(tasks)
     })
+
+@app.route('/debug')
+def debug_info():
+    debug_html = '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Debug Info</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .task { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+            pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+        </style>
+    </head>
+    <body>
+        <h1>调试信息</h1>
+        <h2>活跃任务 (''' + str(len(tasks)) + ''')</h2>
+    '''
+    
+    for task_id, task in tasks.items():
+        debug_html += f'''
+        <div class="task">
+            <h3>任务 ID: {task_id}</h3>
+            <p><strong>状态:</strong> {task.status}</p>
+            <p><strong>进度:</strong> {task.progress}%</p>
+            <p><strong>URL:</strong> {task.url}</p>
+            <p><strong>创建时间:</strong> {task.created_at}</p>
+            <p><strong>错误:</strong> {task.error or '无'}</p>
+            <p><strong>文件:</strong></p>
+            <pre>{task.files}</pre>
+        </div>
+        '''
+    
+    if not tasks:
+        debug_html += '<p>暂无活跃任务</p>'
+    
+    debug_html += '''
+        <h2>示例下载链接测试</h2>
+        <p><a href="https://www.soundjay.com/misc/sounds/beep-07a.mp3" target="_blank">测试MP3下载</a></p>
+        <p><a href="https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4" target="_blank">测试MP4下载</a></p>
+        
+        <script>
+            setTimeout(() => location.reload(), 10000);
+        </script>
+    </body>
+    </html>
+    '''
+    
+    return debug_html
 
 @app.route('/api/video-info', methods=['POST', 'OPTIONS'])
 def get_video_info():
@@ -308,9 +373,12 @@ def get_conversion_status(task_id):
     
     return jsonify(response)
 
-@app.route('/api/download/<task_id>/<format_type>', methods=['GET'])
+@app.route('/api/download/<task_id>/<format_type>', methods=['GET', 'OPTIONS'])
 def download_file(task_id, format_type):
     """下载文件"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'})
+        
     if task_id not in tasks:
         abort(404)
     
