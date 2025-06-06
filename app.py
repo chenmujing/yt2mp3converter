@@ -15,12 +15,8 @@ from datetime import datetime, timedelta
 import logging
 
 app = Flask(__name__)
-# CORS配置 - 允许GitHub Pages和本地开发
-CORS(app, origins=[
-    'https://chenmujing.github.io',  # 你的GitHub Pages
-    'http://localhost:5000',   # 本地开发
-    'http://127.0.0.1:5000'    # 本地开发
-], supports_credentials=True)
+# CORS配置 - 允许所有来源（修复crashed问题）
+CORS(app, origins=['*'])
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
