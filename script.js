@@ -385,22 +385,31 @@ async function monitorConversionProgress(taskId) {
                     clearInterval(statusCheckInterval);
                     statusCheckInterval = null;
                     
+                    // 安全检查响应数据
+                    const files = status.files || {};
+                    const videoInfo = status.video_info || {};
+                    
                     // Display download links
-                    displayRealDownloadItems(status.files, status.video_info);
+                    if (Object.keys(files).length > 0) {
+                        displayRealDownloadItems(files, videoInfo);
+                        
+                        // Add to history
+                        addToHistory({
+                            url: document.getElementById('youtube-url').value.trim(),
+                            videoInfo: videoInfo,
+                            timestamp: new Date().toISOString(),
+                            taskId: taskId,
+                            files: files
+                        });
+                        
+                        showNotification('All formats converted successfully!', 'success');
+                    } else {
+                        throw new Error('No download files available');
+                    }
                     
                     // Hide progress section
                     document.getElementById('progress-section').style.display = 'none';
                     
-                    // Add to history
-                    addToHistory({
-                        url: document.getElementById('youtube-url').value.trim(),
-                        videoInfo: status.video_info,
-                        timestamp: new Date().toISOString(),
-                        taskId: taskId,
-                        files: status.files
-                    });
-                    
-                    showNotification('All formats converted successfully!', 'success');
                     resolve();
                     
                 } else if (status.status === 'error') {
@@ -419,9 +428,19 @@ async function monitorConversionProgress(taskId) {
 }
 
 function displayVideoInfo(videoInfo) {
-    document.getElementById('video-thumbnail').src = videoInfo.thumbnail;
-    document.getElementById('video-title').textContent = videoInfo.title;
-    document.getElementById('video-duration').textContent = `Duration: ${videoInfo.duration_string || 'Unknown'} | Channel: ${videoInfo.uploader || 'Unknown'}`;
+    if (!videoInfo) {
+        console.error('Video info is null or undefined');
+        return;
+    }
+    
+    const thumbnail = videoInfo.thumbnail || 'https://via.placeholder.com/320x180?text=No+Thumbnail';
+    const title = videoInfo.title || 'Unknown Title';
+    const duration = videoInfo.duration_string || 'Unknown';
+    const uploader = videoInfo.uploader || 'Unknown';
+    
+    document.getElementById('video-thumbnail').src = thumbnail;
+    document.getElementById('video-title').textContent = title;
+    document.getElementById('video-duration').textContent = `Duration: ${duration} | Channel: ${uploader}`;
 }
 
 function updateConversionStatus(status) {
@@ -430,6 +449,12 @@ function updateConversionStatus(status) {
 
 // Display real download items with actual backend links
 function displayRealDownloadItems(files, videoInfo) {
+    if (!files || typeof files !== 'object') {
+        console.error('Files data is invalid:', files);
+        showNotification('No download files available', 'error');
+        return;
+    }
+    
     const downloadsSection = document.getElementById('downloads-section');
     const audioDownloads = document.getElementById('audio-downloads');
     const videoDownloads = document.getElementById('video-downloads');
@@ -445,10 +470,15 @@ function displayRealDownloadItems(files, videoInfo) {
     // Process all available files
     Object.keys(files).forEach((format, index) => {
         const fileInfo = files[format];
+        if (!fileInfo || !fileInfo.filename || !fileInfo.download_url) {
+            console.error('Invalid file info:', fileInfo);
+            return;
+        }
+        
         let item = {
             name: fileInfo.filename,
-            size: formatFileSize(fileInfo.size),
-            url: `http://localhost:5000${fileInfo.download_url}`,
+            size: formatFileSize(fileInfo.size || 0),
+            url: `${API_BASE_URL.replace('/api', '')}${fileInfo.download_url}`,
         };
         
         if (format.startsWith('mp3')) {
@@ -473,7 +503,11 @@ function displayRealDownloadItems(files, videoInfo) {
         videoSection.style.display = hasVideo ? 'block' : 'none';
     }
     
-    downloadsSection.style.display = 'block';
+    if (hasAudio || hasVideo) {
+        downloadsSection.style.display = 'block';
+    } else {
+        showNotification('No download files generated', 'error');
+    }
 }
 
 function createRealDownloadItem(item, type, index) {
