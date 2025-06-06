@@ -8,8 +8,10 @@ let currentTaskId = null;
 let statusCheckInterval = null;
 let selectedFormat = 'mp3'; // 默认选择MP3格式
 
-// API配置
-const API_BASE_URL = 'http://localhost:5000/api';
+// API配置 - 动态检测环境
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:5000/api' 
+    : 'https://yt2mp3converter-production.up.railway.app/api';
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
