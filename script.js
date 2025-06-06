@@ -13,6 +13,19 @@ const API_BASE_URL = window.location.hostname === 'localhost' || window.location
     ? 'http://localhost:5000/api' 
     : 'https://yt2mp3converter-production.up.railway.app/api';
 
+// 添加请求拦截器处理CORS
+const fetchWithCORS = async (url, options = {}) => {
+    const defaultOptions = {
+        mode: 'cors',
+        credentials: 'omit',
+        headers: {
+            'Content-Type': 'application/json',
+            ...options.headers
+        }
+    };
+    return fetch(url, { ...defaultOptions, ...options });
+};
+
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
@@ -229,11 +242,8 @@ function getYouTubeVideoId(url) {
 // Get video info from backend API
 async function getVideoInfo(url) {
     try {
-        const response = await fetch(`${API_BASE_URL}/video-info`, {
+        const response = await fetchWithCORS(`${API_BASE_URL}/video-info`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
             body: JSON.stringify({ url: url })
         });
         
@@ -297,11 +307,8 @@ async function startConversion() {
             formats = ['mp4_720']; // 只转换MP4 720p
         }
         
-        const response = await fetch(`${API_BASE_URL}/convert`, {
+        const response = await fetchWithCORS(`${API_BASE_URL}/convert`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
             body: JSON.stringify({ 
                 url: url,
                 formats: formats
@@ -345,7 +352,7 @@ async function monitorConversionProgress(taskId) {
     return new Promise((resolve, reject) => {
         statusCheckInterval = setInterval(async () => {
             try {
-                const response = await fetch(`${API_BASE_URL}/status/${taskId}`);
+                const response = await fetchWithCORS(`${API_BASE_URL}/status/${taskId}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
