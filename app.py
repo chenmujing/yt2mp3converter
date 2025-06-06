@@ -221,170 +221,192 @@ def start_conversion():
         return jsonify({'error': str(e)}), 500
 
 def perform_conversion(task_id):
-    """执行转换"""
+    """执行转换 - 真实下载YouTube视频"""
     task = tasks[task_id]
     
     try:
         task.status = 'processing'
         task.progress = 10
         
-        # 先尝试获取视频信息
-        video_id = task.url.split('v=')[-1][:11] if 'v=' in task.url else 'demo123'
-        
+        # 必须使用yt-dlp进行真实下载
         try:
             import yt_dlp
             
-            # 获取视频信息
-            ydl_opts = {
-                'quiet': True,
-                'no_warnings': True,
-                'no_proxy': True,
-                'socket_timeout': 30,
-                'retries': 2,
-                'nocheckcertificate': True,
-            }
+            # 先获取视频信息
+            task.progress = 20
+            video_info = get_real_video_info(task.url)
+            task.video_info = video_info
             
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(task.url, download=False)
-                task.video_info = {
-                    'id': info.get('id', video_id),
-                    'title': info.get('title', f'YouTube视频 - {video_id}'),
-                    'duration': info.get('duration', 180),
-                    'duration_string': info.get('duration_string', '3:00'),
-                    'thumbnail': info.get('thumbnail', f'https://img.youtube.com/vi/{video_id}/maxresdefault.jpg'),
-                    'uploader': info.get('uploader', 'YouTube频道')
-                }
+            # 真实下载文件
+            task.progress = 40
+            download_real_files(task)
             
-            task.progress = 30
-            
-            # 尝试真实下载
-            download_with_yt_dlp(task)
+            task.status = 'completed'
+            task.progress = 100
             
         except ImportError:
-            print("yt-dlp not available, using fallback")
-            use_fallback_conversion(task, video_id)
+            task.status = 'error'
+            task.error = 'yt-dlp不可用，无法下载视频'
+            print("yt-dlp not available")
         except Exception as e:
-            print(f"yt-dlp conversion failed: {e}")
-            use_fallback_conversion(task, video_id)
-        
-        # 确保总是有文件可以下载
-        if not task.files:
-            print("No files generated, setting up fallback")
-            setup_fallback_files(task)
-            
-        task.status = 'completed'
-        task.progress = 100
+            task.status = 'error'
+            task.error = f'下载失败: {str(e)}'
+            print(f"Download failed: {e}")
         
     except Exception as e:
-        print(f"Conversion error: {e}")
-        # 即使出错也提供降级文件
-        if not task.files:
-            setup_fallback_files(task)
         task.status = 'error'
-        task.error = str(e)
+        task.error = f'转换失败: {str(e)}'
+        print(f"Conversion error: {e}")
 
-def download_with_yt_dlp(task):
-    """使用yt-dlp真实下载"""
-    try:
-        import yt_dlp
+def get_real_video_info(url):
+    """获取真实的视频信息"""
+    import yt_dlp
+    
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'socket_timeout': 60,
+        'retries': 3,
+        'nocheckcertificate': True,
+        'extract_flat': False,
+        'writeinfojson': False,
+        'writethumbnail': False,
+        'writesubtitles': False,
+        'writeautomaticsub': False,
+    }
+    
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
         
-        video_id = task.video_info['id']
-        safe_title = "".join(c for c in task.video_info['title'][:50] if c.isalnum() or c in (' ', '-', '_')).strip()
-        
-        # 下载MP3
-        mp3_filename = f"{video_id}_{safe_title}.mp3"
-        mp3_filepath = os.path.join(TEMP_DIR, mp3_filename)
-        
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': mp3_filepath.replace('.mp3', '.%(ext)s'),
-            'quiet': True,
-            'no_warnings': True,
-            'extractaudio': True,
-            'audioformat': 'mp3',
-            'audioquality': '256',
-            'socket_timeout': 60,
-            'retries': 2,
-            'nocheckcertificate': True,
+        return {
+            'id': info.get('id', 'unknown'),
+            'title': info.get('title', 'Unknown Title'),
+            'duration': info.get('duration', 0),
+            'duration_string': info.get('duration_string', 'Unknown'),
+            'thumbnail': info.get('thumbnail', ''),
+            'uploader': info.get('uploader', 'Unknown'),
+            'view_count': info.get('view_count', 0),
+            'upload_date': info.get('upload_date', '')
         }
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+
+def download_real_files(task):
+    """下载真实的音频和视频文件"""
+    import yt_dlp
+    
+    video_id = task.video_info['id']
+    safe_title = "".join(c for c in task.video_info['title'][:50] if c.isalnum() or c in (' ', '-', '_')).strip()
+    
+    print(f"开始下载: {task.video_info['title']}")
+    
+    # 下载音频 (MP3)
+    task.progress = 50
+    mp3_filename = f"{video_id}_{safe_title}.mp3"
+    mp3_filepath = os.path.join(TEMP_DIR, mp3_filename)
+    
+    ydl_opts_audio = {
+        'format': 'bestaudio/best',
+        'outtmpl': mp3_filepath.replace('.mp3', '.%(ext)s'),
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '256',
+        }],
+        'quiet': False,
+        'no_warnings': False,
+        'socket_timeout': 120,
+        'retries': 3,
+        'nocheckcertificate': True,
+        'extract_flat': False,
+        'ignoreerrors': False,
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl:
             ydl.download([task.url])
-        
-        # 查找实际下载的文件
-        found_file = False
+            
+        # 查找下载的音频文件
+        audio_file_found = False
         for file in os.listdir(TEMP_DIR):
-            if file.startswith(video_id) and file.endswith('.mp3'):
+            if video_id in file and (file.endswith('.mp3') or file.endswith('.m4a') or file.endswith('.webm')):
                 actual_filepath = os.path.join(TEMP_DIR, file)
+                # 如果不是mp3，重命名为mp3
+                if not file.endswith('.mp3'):
+                    new_filepath = os.path.join(TEMP_DIR, f"{video_id}_{safe_title}.mp3")
+                    os.rename(actual_filepath, new_filepath)
+                    actual_filepath = new_filepath
+                
+                task.files = task.files or {}
                 task.files['mp3_256'] = {
                     'filename': f"{safe_title}.mp3",
                     'path': actual_filepath,
                     'size': os.path.getsize(actual_filepath),
                     'download_url': f'/api/download/{task.task_id}/mp3_256'
                 }
-                found_file = True
+                audio_file_found = True
+                print(f"音频文件下载成功: {actual_filepath}")
                 break
-        
-        # 如果没有找到下载的文件，使用降级方案
-        if not found_file:
-            print("No downloaded file found, using fallback")
-            setup_fallback_files(task)
-        
-        task.progress = 80
-        
+                
+        if not audio_file_found:
+            raise Exception("音频文件下载失败")
+            
     except Exception as e:
-        print(f"yt-dlp download failed: {e}")
-        # 出现任何错误都使用降级方案
-        setup_fallback_files(task)
-
-def setup_fallback_files(task):
-    """设置降级文件下载"""
-    # 确保有video_info
-    if not task.video_info:
-        video_id = task.url.split('v=')[-1][:11] if 'v=' in task.url else 'demo123'
-        task.video_info = {
-            'id': video_id,
-            'title': f'YouTube视频 - {video_id}',
-            'duration': 180,
-            'duration_string': '3:00',
-            'thumbnail': f'https://img.youtube.com/vi/{video_id}/maxresdefault.jpg',
-            'uploader': 'YouTube频道'
-        }
+        print(f"音频下载出错: {e}")
+        raise Exception(f"音频下载失败: {str(e)}")
     
-    # 使用重定向URL
-    task.files = {
-        'mp3_256': {
-            'filename': f'{task.video_info["title"]}.mp3',
-            'size': 5242880,
-            'download_url': f'/api/download/{task.task_id}/mp3_256',
-            'redirect_url': 'https://www.soundjay.com/misc/sounds/beep-07a.mp3'
-        },
-        'mp4_720': {
-            'filename': f'{task.video_info["title"]}.mp4',
-            'size': 15728640,
-            'download_url': f'/api/download/{task.task_id}/mp4_720',
-            'redirect_url': 'https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4'
-        }
-    }
-
-def use_fallback_conversion(task, video_id):
-    """使用降级转换（重定向到示例文件）"""
-    task.video_info = {
-        'id': video_id,
-        'title': f'YouTube视频 - {video_id}',
-        'duration': 180,
-        'duration_string': '3:00',
-        'thumbnail': f'https://img.youtube.com/vi/{video_id}/maxresdefault.jpg',
-        'uploader': 'YouTube频道'
-    }
-    
-    task.progress = 50
-    time.sleep(2)  # 模拟处理时间
-    
-    # 使用降级文件设置
-    setup_fallback_files(task)
-    
+    # 下载视频 (MP4)
     task.progress = 80
+    mp4_filename = f"{video_id}_{safe_title}.mp4"
+    mp4_filepath = os.path.join(TEMP_DIR, mp4_filename)
+    
+    ydl_opts_video = {
+        'format': 'best[height<=720]/best',
+        'outtmpl': mp4_filepath.replace('.mp4', '.%(ext)s'),
+        'quiet': False,
+        'no_warnings': False,
+        'socket_timeout': 120,
+        'retries': 3,
+        'nocheckcertificate': True,
+        'extract_flat': False,
+        'ignoreerrors': False,
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
+            ydl.download([task.url])
+            
+        # 查找下载的视频文件
+        video_file_found = False
+        for file in os.listdir(TEMP_DIR):
+            if video_id in file and (file.endswith('.mp4') or file.endswith('.webm') or file.endswith('.mkv')):
+                actual_filepath = os.path.join(TEMP_DIR, file)
+                # 如果不是mp4，重命名为mp4
+                if not file.endswith('.mp4'):
+                    new_filepath = os.path.join(TEMP_DIR, f"{video_id}_{safe_title}.mp4")
+                    os.rename(actual_filepath, new_filepath)
+                    actual_filepath = new_filepath
+                
+                task.files = task.files or {}
+                task.files['mp4_720'] = {
+                    'filename': f"{safe_title}.mp4",
+                    'path': actual_filepath,
+                    'size': os.path.getsize(actual_filepath),
+                    'download_url': f'/api/download/{task.task_id}/mp4_720'
+                }
+                video_file_found = True
+                print(f"视频文件下载成功: {actual_filepath}")
+                break
+                
+        if not video_file_found:
+            print("视频下载失败，但音频成功")
+            
+    except Exception as e:
+        print(f"视频下载出错: {e}")
+        # 视频下载失败不是致命错误，只要音频成功就行
+        
+    task.progress = 90
+    print(f"下载完成，生成了 {len(task.files)} 个文件")
+
+# 移除旧的降级函数，现在只进行真实下载
 
 @app.route('/api/status/<task_id>', methods=['GET'])
 def get_conversion_status(task_id):
@@ -414,34 +436,37 @@ def get_conversion_status(task_id):
 
 @app.route('/api/download/<task_id>/<format_type>', methods=['GET', 'OPTIONS'])
 def download_file(task_id, format_type):
-    """下载文件"""
+    """下载真实文件"""
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'})
         
+    print(f"Download request: task_id={task_id}, format_type={format_type}")
+    
     if task_id not in tasks:
+        print(f"Task {task_id} not found")
         abort(404)
     
     task = tasks[task_id]
     
-    if format_type not in task.files:
+    if not task.files or format_type not in task.files:
+        print(f"Format {format_type} not found in task files: {task.files}")
         abort(404)
     
     file_info = task.files[format_type]
+    print(f"File info: {file_info}")
     
-    # 如果有真实文件路径，发送文件
+    # 只发送真实文件
     if 'path' in file_info and os.path.exists(file_info['path']):
+        print(f"Sending file: {file_info['path']}")
         return send_file(
             file_info['path'],
             as_attachment=True,
             download_name=file_info['filename'],
             mimetype='audio/mpeg' if format_type.startswith('mp3') else 'video/mp4'
         )
-    
-    # 否则重定向到示例文件
-    elif 'redirect_url' in file_info:
-        return redirect(file_info['redirect_url'], code=302)
-    
-    abort(404)
+    else:
+        print(f"File not found: {file_info.get('path', 'No path specified')}")
+        abort(404)
 
 # 清理旧文件
 def cleanup_old_files():
