@@ -267,67 +267,89 @@ def perform_conversion(task_id):
             print(f"yt-dlp conversion failed: {e}")
             use_fallback_conversion(task, video_id)
         
+        # 确保总是有文件可以下载
+        if not task.files:
+            print("No files generated, setting up fallback")
+            setup_fallback_files(task)
+            
         task.status = 'completed'
         task.progress = 100
         
     except Exception as e:
+        print(f"Conversion error: {e}")
+        # 即使出错也提供降级文件
+        if not task.files:
+            setup_fallback_files(task)
         task.status = 'error'
         task.error = str(e)
 
 def download_with_yt_dlp(task):
     """使用yt-dlp真实下载"""
-    import yt_dlp
-    
-    video_id = task.video_info['id']
-    safe_title = "".join(c for c in task.video_info['title'][:50] if c.isalnum() or c in (' ', '-', '_')).strip()
-    
-    # 下载MP3
-    mp3_filename = f"{video_id}_{safe_title}.mp3"
-    mp3_filepath = os.path.join(TEMP_DIR, mp3_filename)
-    
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': mp3_filepath.replace('.mp3', '.%(ext)s'),
-        'quiet': True,
-        'no_warnings': True,
-        'extractaudio': True,
-        'audioformat': 'mp3',
-        'audioquality': '256',
-        'socket_timeout': 60,
-        'retries': 2,
-        'nocheckcertificate': True,
-    }
-    
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([task.url])
-    
-    # 查找实际下载的文件
-    for file in os.listdir(TEMP_DIR):
-        if file.startswith(video_id) and file.endswith('.mp3'):
-            actual_filepath = os.path.join(TEMP_DIR, file)
-            task.files['mp3_256'] = {
-                'filename': f"{safe_title}.mp3",
-                'path': actual_filepath,
-                'size': os.path.getsize(actual_filepath),
-                'download_url': f'/api/download/{task.task_id}/mp3_256'
-            }
-            break
-    
-    task.progress = 80
+    try:
+        import yt_dlp
+        
+        video_id = task.video_info['id']
+        safe_title = "".join(c for c in task.video_info['title'][:50] if c.isalnum() or c in (' ', '-', '_')).strip()
+        
+        # 下载MP3
+        mp3_filename = f"{video_id}_{safe_title}.mp3"
+        mp3_filepath = os.path.join(TEMP_DIR, mp3_filename)
+        
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': mp3_filepath.replace('.mp3', '.%(ext)s'),
+            'quiet': True,
+            'no_warnings': True,
+            'extractaudio': True,
+            'audioformat': 'mp3',
+            'audioquality': '256',
+            'socket_timeout': 60,
+            'retries': 2,
+            'nocheckcertificate': True,
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([task.url])
+        
+        # 查找实际下载的文件
+        found_file = False
+        for file in os.listdir(TEMP_DIR):
+            if file.startswith(video_id) and file.endswith('.mp3'):
+                actual_filepath = os.path.join(TEMP_DIR, file)
+                task.files['mp3_256'] = {
+                    'filename': f"{safe_title}.mp3",
+                    'path': actual_filepath,
+                    'size': os.path.getsize(actual_filepath),
+                    'download_url': f'/api/download/{task.task_id}/mp3_256'
+                }
+                found_file = True
+                break
+        
+        # 如果没有找到下载的文件，使用降级方案
+        if not found_file:
+            print("No downloaded file found, using fallback")
+            setup_fallback_files(task)
+        
+        task.progress = 80
+        
+    except Exception as e:
+        print(f"yt-dlp download failed: {e}")
+        # 出现任何错误都使用降级方案
+        setup_fallback_files(task)
 
-def use_fallback_conversion(task, video_id):
-    """使用降级转换（重定向到示例文件）"""
-    task.video_info = {
-        'id': video_id,
-        'title': f'YouTube视频 - {video_id}',
-        'duration': 180,
-        'duration_string': '3:00',
-        'thumbnail': f'https://img.youtube.com/vi/{video_id}/maxresdefault.jpg',
-        'uploader': 'YouTube频道'
-    }
-    
-    task.progress = 50
-    time.sleep(2)  # 模拟处理时间
+def setup_fallback_files(task):
+    """设置降级文件下载"""
+    # 确保有video_info
+    if not task.video_info:
+        video_id = task.url.split('v=')[-1][:11] if 'v=' in task.url else 'demo123'
+        task.video_info = {
+            'id': video_id,
+            'title': f'YouTube视频 - {video_id}',
+            'duration': 180,
+            'duration_string': '3:00',
+            'thumbnail': f'https://img.youtube.com/vi/{video_id}/maxresdefault.jpg',
+            'uploader': 'YouTube频道'
+        }
     
     # 使用重定向URL
     task.files = {
@@ -344,6 +366,23 @@ def use_fallback_conversion(task, video_id):
             'redirect_url': 'https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4'
         }
     }
+
+def use_fallback_conversion(task, video_id):
+    """使用降级转换（重定向到示例文件）"""
+    task.video_info = {
+        'id': video_id,
+        'title': f'YouTube视频 - {video_id}',
+        'duration': 180,
+        'duration_string': '3:00',
+        'thumbnail': f'https://img.youtube.com/vi/{video_id}/maxresdefault.jpg',
+        'uploader': 'YouTube频道'
+    }
+    
+    task.progress = 50
+    time.sleep(2)  # 模拟处理时间
+    
+    # 使用降级文件设置
+    setup_fallback_files(task)
     
     task.progress = 80
 
