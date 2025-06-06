@@ -16,11 +16,7 @@ import logging
 
 app = Flask(__name__)
 # CORS配置 - 允许GitHub Pages和本地开发
-CORS(app, origins=[
-    'https://*.github.io',  # GitHub Pages
-    'http://localhost:*',   # 本地开发
-    'http://127.0.0.1:*'    # 本地开发
-])
+   CORS(app, origins=['*'])  # 允许所有来源（临时解决方案）
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
