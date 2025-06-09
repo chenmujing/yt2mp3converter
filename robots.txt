@@ -1,0 +1,27 @@
+User-agent: *
+Allow: /
+
+# 允许搜索引擎抓取主要页面
+Allow: /index.html
+Allow: /mp4.html
+Allow: *.css
+Allow: *.js
+Allow: *.png
+Allow: *.jpg
+Allow: *.svg
+Allow: *.ico
+
+# 禁止抓取临时文件和私有目录
+Disallow: /temp_files/
+Disallow: /__pycache__/
+Disallow: /.git/
+Disallow: /deploy/
+Disallow: *.tmp
+Disallow: *.py
+Disallow: *.md
+
+# 网站地图位置
+Sitemap: https://www.yt2mp3converter.online/sitemap.xml
+
+# 延迟设置（友好对待服务器）
+Crawl-delay: 1 
