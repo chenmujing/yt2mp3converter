@@ -1,0 +1,22 @@
+# YouTube to MP3 Converter - 最终修复版依赖
+# 版本锁定以确保稳定性和兼容性
+
+# 核心依赖
+yt-dlp==2024.12.13          # YouTube下载器，最新稳定版
+flask==3.0.0                # Web框架
+flask-cors==4.0.0           # 跨域支持
+
+# 音频处理
+ffmpeg-python==0.2.0        # FFmpeg Python绑定
+
+# 工具库
+requests==2.31.0            # HTTP请求库
+urllib3==2.1.0              # URL处理库
+
+# 系统兼容性
+python-dotenv==1.0.0        # 环境变量管理
+psutil==5.9.6               # 系统进程监控
+
+# 开发和调试（可选）
+gunicorn==21.2.0            # 生产WSGI服务器
+werkzeug==3.0.1             # WSGI工具库 
