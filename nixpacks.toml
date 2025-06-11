@@ -1,5 +1,5 @@
 [phases.setup]
 nixPkgs = ["python3", "ffmpeg"]
-
+ 
 [phases.build]
 cmds = ["ffmpeg -version || echo 'FFmpeg check completed'"] 
